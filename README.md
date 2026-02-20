@@ -1,4 +1,5 @@
-# Seestar-MarkOne-Kit
+# Seestar-S50-Solar-Filter
+
 3D printable solar filter kit for Seestar telescope
 
 This is a two-part, snapable design.
