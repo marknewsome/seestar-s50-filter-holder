@@ -4,6 +4,8 @@
 
 This is a two-part, snapable design.
 
+** Waiting for this to come back from printing to see if it is a viable design (29 Feb 26) **
+
 Steps:
 1. run create_venv.sh to create a virtual environment with dependencies from requirements.txt
 2. source ./activate_venv.sh
