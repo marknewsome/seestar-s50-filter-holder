@@ -1,6 +1,9 @@
 """
 Seestar S50 Solar Filter for Baader Film
 Single-piece press-fit design — matches OEM form factor, ~2mm protrusion above scope face
+
+Combined print: filter body + retaining ring lay flat side-by-side, joined by two
+thin sacrificial bridges (0.8 mm tall).  Snap or cut the bridges before assembly.
 """
 
 import cadquery as cq
@@ -132,56 +135,55 @@ retaining_ring = (
     .extrude(RETAINING_RING_HEIGHT)
 )
 
-# ── Combined single-file print ─────────────────────────────────────────────────
-# Retaining ring floats above filter body with a print-clearance gap, held by
-# three thin sprues that are easily cut with flush cutters or a hobby knife.
-SPRUE_GAP        = 0.5   # mm gap between parts — enough for a thin blade
-SPRUE_SIZE       = 1.2   # mm square cross-section — small enough to cut by hand
-SPRUE_BITE       = 0.4   # mm the sprue penetrates each part for a solid union
-SPRUE_COUNT      = 3
-SPRUE_START_ANGLE = 60   # degrees — offset so sprues avoid the 0° tab
+# ── Combined single-file print (flat layout with sacrificial bridges) ──────────
+# Retaining ring sits to the LEFT of the filter body (opposite the 0° tab).
+# Two ultra-thin bridges (0.4 mm = 2 layers) connect their facing edges —
+# snap cleanly by hand or score with a fingernail.
+BRIDGE_GAP    = 2.0  # mm between the two parts — room for a hobby knife blade
+BRIDGE_WIDTH  = 3.0  # mm (Y extent per bridge)
+BRIDGE_HEIGHT = 0.4  # mm tall — 2 × 0.2 mm layers; snaps with finger pressure
 
-# Retaining ring lifted by the print gap
-_ring_z = FLANGE_HEIGHT + SPRUE_GAP
-retaining_ring_lifted = retaining_ring.translate((0, 0, _ring_z))
+_ring_outer_r  = (LENS_OPENING + 2 * FILM_GROOVE_WIDTH) / 2    # 26 mm
+_ring_offset_x = -(FLANGE_DIAMETER / 2 + BRIDGE_GAP + _ring_outer_r)  # -56 mm
 
-# Sprue radial position: midpoint of retaining ring width (r = 23–26 mm)
-_sprue_r = (LENS_OPENING / 2 + (LENS_OPENING + 2 * FILM_GROOVE_WIDTH) / 2) / 2
-_sprue_z = FLANGE_HEIGHT - SPRUE_BITE                           # start (inside flange top)
-_sprue_h = SPRUE_BITE + SPRUE_GAP + RETAINING_RING_HEIGHT + SPRUE_BITE  # total height
+# Retaining ring placed to the LEFT of the filter body (flat, same Z=0 base)
+retaining_ring_flat = retaining_ring.translate((_ring_offset_x, 0, 0))
 
-def _make_sprue(angle_deg):
-    a = math.radians(angle_deg)
-    x = _sprue_r * math.cos(a)
-    y = _sprue_r * math.sin(a)
+# Bridge geometry: spans the gap on the left side
+_bridge_x1  = _ring_offset_x + _ring_outer_r   # right edge of retaining ring: -30 mm
+_bridge_x2  = -FLANGE_DIAMETER / 2             # left edge of filter body:     -28 mm
+_bridge_cx  = (_bridge_x1 + _bridge_x2) / 2    # centre of gap:                -29 mm
+_bridge_len = _bridge_x2 - _bridge_x1          # == BRIDGE_GAP (2 mm)
+
+# Two bridges symmetrically offset in Y
+_bridge_y_spacing = BRIDGE_WIDTH + 3.0          # centre-to-centre: 6 mm
+
+def _make_bridge(y_pos):
     return (
         cq.Workplane("XY")
-        .center(x, y)
-        .rect(SPRUE_SIZE, SPRUE_SIZE)
-        .extrude(_sprue_h)
-        .translate((0, 0, _sprue_z))
+        .center(_bridge_cx, y_pos)
+        .rect(_bridge_len, BRIDGE_WIDTH)
+        .extrude(BRIDGE_HEIGHT)
     )
 
-combined_body = filter_body.union(retaining_ring_lifted)
-for i in range(SPRUE_COUNT):
-    combined_body = combined_body.union(
-        _make_sprue(SPRUE_START_ANGLE + i * (360 / SPRUE_COUNT))
-    )
+combined_body = filter_body.union(retaining_ring_flat)
+for y in (-_bridge_y_spacing / 2, _bridge_y_spacing / 2):
+    combined_body = combined_body.union(_make_bridge(y))
 
-cq.exporters.export(filter_body,    "seestar_s50_solar_filter.stl")
-cq.exporters.export(retaining_ring, "seestar_s50_solar_filter_retainer.stl")
-cq.exporters.export(combined_body,  "seestar_s50_solar_filter_combined.stl")
+cq.exporters.export(filter_body,    "output/seestar_s50_solar_filter.stl")
+cq.exporters.export(retaining_ring, "output/seestar_s50_solar_filter_retainer.stl")
+cq.exporters.export(combined_body,  "output/seestar_s50_solar_filter_combined.stl")
 
 film_diameter = LENS_OPENING + 2 * FILM_GROOVE_WIDTH
 
 print("STL files generated:")
-print("  seestar_s50_solar_filter.stl")
-print("  seestar_s50_solar_filter_retainer.stl")
-print("  seestar_s50_solar_filter_combined.stl  ← single file for print libraries")
+print("  output/seestar_s50_solar_filter.stl")
+print("  output/seestar_s50_solar_filter_retainer.stl")
+print("  output/seestar_s50_solar_filter_combined.stl  ← single file for print libraries")
 print(f"\nCut Baader film to {film_diameter}mm diameter circle")
 print("\nAssembly instructions (combined print):")
 print(f"1. Cut Baader film to {film_diameter}mm diameter")
-print("2. Clip or knife the 3 sprues at the gap line to free the retaining ring")
+print("2. Snap or knife the 2 flat bridges to separate the retaining ring")
 print("3. Apply thin bead of RTV silicone in the groove on the top face")
 print("4. Lay film over the opening and press edges into the groove")
 print("5. Apply another thin bead of RTV on top of the film edge")
@@ -193,4 +195,6 @@ print("- Material: PETG or ABS (heat resistant)")
 print("- Layer height: 0.2mm")
 print("- Infill: 40%")
 print("- Supports: None needed")
-print("- Orientation: Flange-side down (nub pointing up during print)")
+print("- Orientation: Flat — both pieces print face-down on the bed")
+print(f"- Layout: filter body at centre, retaining ring {abs(_ring_offset_x):.0f} mm to the left")
+print(f"- Total footprint: ~{FLANGE_DIAMETER + BRIDGE_GAP + 2*_ring_outer_r:.0f} mm × {FLANGE_DIAMETER:.0f} mm")
